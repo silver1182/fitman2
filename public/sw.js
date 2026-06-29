@@ -1,8 +1,11 @@
-const CACHE = 'fitman-v1'
+// 根据 sw.js 自身位置推断基础路径（APK 和 GitHub Pages 都适用）
+const BASE = self.location.pathname.replace(/\/sw\.js$/, '/')
+
+const CACHE = 'fitman-v2'
 const ASSETS = [
-  '/fitman2/',
-  '/fitman2/index.html',
-  '/fitman2/manifest.json',
+  BASE,
+  BASE + 'index.html',
+  BASE + 'manifest.json',
 ]
 
 // 安装：缓存静态资源
@@ -43,7 +46,7 @@ self.addEventListener('fetch', event => {
       }).catch(() => {
         // 离线且无缓存 → 返回首页
         if (event.request.mode === 'navigate') {
-          return caches.match('/fitman2/')
+          return caches.match(BASE)
         }
       })
     })
