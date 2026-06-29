@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 function buildExercises(template) {
   if (!template) return [{ name: '动作1', sets: [{ weight: '', reps: '', done: false }] }]
@@ -10,26 +10,32 @@ function buildExercises(template) {
 
 export default function Workout({ template, onFinish }) {
   const [exercises, setExercises] = useState(() => buildExercises(template))
-  const [timer, setTimer] = useState(null)
+  const [timer, setTimer] = useState(null)           // null=不显示, 数字=剩余秒数, 0=刚结束
   const [timerDuration, setTimerDuration] = useState(60)
-  const [timerFlash, setTimerFlash] = useState(false)
   const intervalRef = useRef(null)
+  const autoDismissRef = useRef(null)
+
+  // 清理所有定时器
+  const clearAllTimers = useCallback(() => {
+    clearInterval(intervalRef.current)
+    clearTimeout(autoDismissRef.current)
+  }, [])
 
   useEffect(() => {
-    return () => clearInterval(intervalRef.current)
-  }, [])
+    return () => clearAllTimers()
+  }, [clearAllTimers])
 
   function startTimer(duration) {
     const d = duration || timerDuration
-    clearInterval(intervalRef.current)
+    clearAllTimers()
     setTimer(d)
-    setTimerFlash(false)
     intervalRef.current = setInterval(() => {
       setTimer(prev => {
         if (prev <= 1) {
           clearInterval(intervalRef.current)
           if (navigator.vibrate) navigator.vibrate([300, 100, 300])
-          setTimerFlash(true)
+          // 倒计时结束，2秒后自动回到训练页
+          autoDismissRef.current = setTimeout(() => setTimer(null), 2000)
           return 0
         }
         return prev - 1
@@ -38,9 +44,8 @@ export default function Workout({ template, onFinish }) {
   }
 
   function stopTimer() {
-    clearInterval(intervalRef.current)
+    clearAllTimers()
     setTimer(null)
-    setTimerFlash(false)
   }
 
   function updateSet(ei, si, field, value) {
@@ -95,9 +100,78 @@ export default function Workout({ template, onFinish }) {
     onFinish()
   }
 
+  // 全屏计时器颜色
   const timerColor = timer === 0 ? '#ef4444' : timer !== null && timer <= 10 ? '#f59e0b' : '#4ade80'
-  const durations = [60, 90, 120]
+  const durations = [30, 60, 90, 120]
 
+  // ====== 全屏计时器视图 ======
+  if (timer !== null) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0,
+        background: timer === 0 ? '#1a0000' : '#0a0a0a',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999,
+        transition: 'background 0.3s',
+      }}>
+        {/* 倒计时数字 */}
+        <div style={{
+          fontSize: 140, fontWeight: 900,
+          color: timerColor,
+          letterSpacing: -4,
+          lineHeight: 1,
+          animation: timer === 0 ? 'none' : undefined,
+          transition: 'color 0.3s',
+          userSelect: 'none',
+        }}>
+          {timer === 0 ? 'GO' : timer}
+        </div>
+
+        {/* 提示文字 */}
+        <div style={{
+          color: timer === 0 ? '#ef4444' : '#555',
+          fontSize: 18, fontWeight: 600, marginTop: 16,
+        }}>
+          {timer === 0 ? '组间休息结束，继续训练' : '秒'}
+        </div>
+
+        {/* 时长选择按钮 */}
+        {timer > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 40 }}>
+            {durations.map(d => (
+              <button
+                key={d}
+                onClick={() => { setTimerDuration(d); startTimer(d) }}
+                style={{
+                  padding: '10px 20px', borderRadius: 12, fontSize: 14, fontWeight: 600,
+                  background: timerDuration === d ? '#222' : 'transparent',
+                  border: `1px solid ${timerDuration === d ? '#444' : '#2a2a2a'}`,
+                  color: timerDuration === d ? '#f0f0f0' : '#555',
+                }}
+              >{d}s</button>
+            ))}
+          </div>
+        )}
+
+        {/* 停止按钮 */}
+        <button
+          onClick={stopTimer}
+          style={{
+            marginTop: 36, padding: '12px 40px',
+            borderRadius: 14, fontSize: 16, fontWeight: 700,
+            background: 'transparent',
+            border: timer === 0 ? '1px solid #ef4444' : '1px solid #333',
+            color: timer === 0 ? '#ef4444' : '#666',
+          }}
+        >
+          {timer === 0 ? '返回训练' : '提前结束'}
+        </button>
+      </div>
+    )
+  }
+
+  // ====== 训练页正常视图 ======
   return (
     <div style={{ padding: 20, paddingBottom: 100 }}>
       {/* 顶部标题 */}
@@ -201,15 +275,14 @@ export default function Workout({ template, onFinish }) {
         padding: 16, color: '#0f0f0f', fontWeight: 800, fontSize: 17,
       }}>完成训练</button>
 
-      {/* 计时器浮窗 */}
+      {/* 计时器触发按钮（右下角浮窗，不点就只看训练页） */}
       <div style={{
         position: 'fixed', right: 16, bottom: 80,
         background: '#1e1e1e',
-        border: `2px solid ${timer !== null ? timerColor : '#2a2a2a'}`,
+        border: '2px solid #2a2a2a',
         borderRadius: 18, padding: '12px 14px',
         minWidth: 130,
-        boxShadow: timer !== null ? `0 0 16px ${timerColor}33` : '0 4px 20px #00000066',
-        transition: 'border-color 0.3s, box-shadow 0.3s',
+        boxShadow: '0 4px 20px #00000066',
         zIndex: 200,
       }}>
         <div style={{ color: '#777', fontSize: 11, marginBottom: 4 }}>组间休息</div>
@@ -219,7 +292,7 @@ export default function Workout({ template, onFinish }) {
           {durations.map(d => (
             <button
               key={d}
-              onClick={() => { setTimerDuration(d); if (timer !== null) startTimer(d) }}
+              onClick={() => setTimerDuration(d)}
               style={{
                 flex: 1, padding: '5px 0', borderRadius: 8, fontSize: 12, fontWeight: 600,
                 background: timerDuration === d ? '#333' : 'none',
@@ -230,27 +303,19 @@ export default function Workout({ template, onFinish }) {
           ))}
         </div>
 
-        {/* 倒计时显示 */}
+        {/* 时长显示 */}
         <div style={{
           fontSize: 32, fontWeight: 800, textAlign: 'center',
-          color: timer !== null ? timerColor : '#444',
-          letterSpacing: 1, marginBottom: 10,
-          animation: timerFlash ? 'none' : undefined,
+          color: '#444', letterSpacing: 1, marginBottom: 10,
         }}>
-          {timer !== null ? `${timer}s` : `${timerDuration}s`}
+          {timerDuration}s
         </div>
 
-        {/* 开始/停止 */}
-        {timer !== null
-          ? <button onClick={stopTimer} style={{
-              width: '100%', background: '#ef444422', border: '1px solid #ef4444',
-              borderRadius: 10, padding: '8px 0', color: '#ef4444', fontWeight: 700, fontSize: 14,
-            }}>停止</button>
-          : <button onClick={() => startTimer()} style={{
-              width: '100%', background: '#4ade8022', border: '1px solid #4ade80',
-              borderRadius: 10, padding: '8px 0', color: '#4ade80', fontWeight: 700, fontSize: 14,
-            }}>开始</button>
-        }
+        {/* 手动开始 */}
+        <button onClick={() => startTimer()} style={{
+          width: '100%', background: '#4ade8022', border: '1px solid #4ade80',
+          borderRadius: 10, padding: '8px 0', color: '#4ade80', fontWeight: 700, fontSize: 14,
+        }}>开始</button>
       </div>
     </div>
   )
