@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const EMPTY_EXERCISE = { name: '', sets: 3, reps: 10 }
+const EMPTY_EXERCISE = { name: '', sets: 3, reps: 10, restSeconds: 60 }
 
 export default function Templates() {
   const [templates, setTemplates] = useState([])
@@ -8,6 +8,7 @@ export default function Templates() {
   const [form, setForm] = useState({ name: '', exercises: [{ ...EMPTY_EXERCISE }] })
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTemplates(JSON.parse(localStorage.getItem('templates') || '[]'))
   }, [])
 
@@ -114,6 +115,18 @@ export default function Templates() {
                 <input
                   type="number" value={ex.reps} min={1} max={100}
                   onChange={e => updateExercise(i, 'reps', e.target.value)}
+                  style={{
+                    display: 'block', width: '100%', marginTop: 4,
+                    background: '#252525', border: '1px solid #333',
+                    borderRadius: 8, padding: '8px 10px', color: '#f0f0f0', fontSize: 14,
+                  }}
+                />
+              </label>
+              <label style={{ flex: 1, color: '#888', fontSize: 12 }}>
+                休息(s)
+                <input
+                  type="number" value={ex.restSeconds || 60} min={15} max={300} step={15}
+                  onChange={e => updateExercise(i, 'restSeconds', e.target.value)}
                   style={{
                     display: 'block', width: '100%', marginTop: 4,
                     background: '#252525', border: '1px solid #333',

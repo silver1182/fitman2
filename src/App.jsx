@@ -21,7 +21,7 @@ export default function App() {
 
   return (
     <>
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 64 }}>
+      <div id="scroll-root" style={{ flex: 1, overflowY: 'auto', paddingBottom: 64 }}>
         {tab === 'home' && <Home onStartWorkout={startWorkout} />}
         {tab === 'workout' && <Workout template={workoutTemplate} onFinish={finishWorkout} />}
         {tab === 'history' && <History />}

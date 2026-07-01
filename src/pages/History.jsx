@@ -23,7 +23,9 @@ function dailySetCounts(workouts) {
       if (!ex) return
       const sets = Array.isArray(ex.sets) ? ex.sets : []
       sets.forEach(s => {
-        if (s && s.done) count++
+        if (!s) return
+        // 兼容旧数据 (done: true) 和新数据 (status: "done")
+        if (s.status === 'done' || s.done === true) count++
       })
     })
     if (count > 0 && w.date) map[w.date] = (map[w.date] || 0) + count
@@ -45,7 +47,6 @@ const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日']
 // ====== 热力图组件 ======
 function Heatmap({ workouts }) {
   const [weeks, setWeeks] = useState(12)
-  const [cells, setCells] = useState([])
   const [weekGrid, setWeekGrid] = useState([])
 
   useEffect(() => {
@@ -73,8 +74,6 @@ function Heatmap({ workouts }) {
         })
         current.setDate(current.getDate() + 1)
       }
-      setCells(result)
-
       // 按周分组
       const grid = []
       let currentWeek = new Array(7).fill(null)
@@ -87,8 +86,9 @@ function Heatmap({ workouts }) {
         }
       })
       if (currentWeek.some(c => c !== null)) grid.push([...currentWeek])
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWeekGrid(grid)
-    } catch (e) {
+    } catch {
       // 静默失败
     }
   }, [workouts, weeks])
@@ -163,16 +163,17 @@ export default function History() {
   const [workouts, setWorkouts] = useState([])
   const [expanded, setExpanded] = useState(null)
 
-  useEffect(() => { load() }, [])
-
   function load() {
     try {
       const w = JSON.parse(localStorage.getItem('workouts') || '[]')
       setWorkouts([...w].reverse())
-    } catch (e) {
+    } catch {
       setWorkouts([])
     }
   }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load() }, [])
 
   function deleteWorkout(id) {
     if (!window.confirm('确认删除这条记录？')) return
@@ -180,7 +181,7 @@ export default function History() {
       const w = JSON.parse(localStorage.getItem('workouts') || '[]')
       localStorage.setItem('workouts', JSON.stringify(w.filter(x => x.id !== id)))
       load()
-    } catch (e) {}
+    } catch { /* ignore */ }
   }
 
   return (
@@ -226,17 +227,23 @@ export default function History() {
               {w.exercises?.map((ex, i) => (
                 <div key={i} style={{ marginBottom: 12 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{ex.name}</div>
-                  {ex.sets?.map((s, j) => (
-                    <div key={j} style={{
-                      display: 'flex', gap: 12, fontSize: 13, color: s.done ? '#4ade80' : '#888',
-                      marginBottom: 4, paddingLeft: 8,
-                    }}>
-                      <span>第{j + 1}组</span>
-                      <span>{s.weight || 0} kg</span>
-                      <span>× {s.reps || 0}</span>
-                      {s.done && <span>✓</span>}
-                    </div>
-                  ))}
+                  {ex.sets?.map((s, j) => {
+                    const isDone = s.status === 'done' || s.done === true
+                    const isSkipped = s.status === 'skipped'
+                    return (
+                      <div key={j} style={{
+                        display: 'flex', gap: 12, fontSize: 13,
+                        color: isDone ? '#4ade80' : isSkipped ? '#f59e0b' : '#888',
+                        marginBottom: 4, paddingLeft: 8,
+                      }}>
+                        <span>第{j + 1}组</span>
+                        <span>{s.weight || 0} kg</span>
+                        <span>× {s.reps || 0}</span>
+                        {isDone && <span>✓</span>}
+                        {isSkipped && <span>⊘</span>}
+                      </div>
+                    )
+                  })}
                 </div>
               ))}
             </div>
